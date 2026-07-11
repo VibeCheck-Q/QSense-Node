@@ -2,6 +2,35 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+// ── Machine identity (edit these to match your setup) ────────────────────────
+const MACHINE_ID        = 'M-01';
+const MACHINE_PLACEMENT = 'Zone A — Line 3';
+
+// Populate stats bar
+document.getElementById('stat-machine-id').textContent = MACHINE_ID;
+document.getElementById('stat-placement').textContent  = MACHINE_PLACEMENT;
+
+// Live run-time counter
+const runtimeStart  = Date.now();
+const runtimeEl     = document.getElementById('stat-runtime');
+function padTwo(n) { return String(n).padStart(2, '0'); }
+
+// Live date & time clock
+const datetimeEl = document.getElementById('stat-datetime');
+function tickClocks() {
+  const now = new Date();
+  // Runtime
+  const s = Math.floor((now - runtimeStart) / 1000);
+  runtimeEl.textContent = `${padTwo(Math.floor(s / 3600))}:${padTwo(Math.floor((s % 3600) / 60))}:${padTwo(s % 60)}`;
+  // Date & time
+  datetimeEl.textContent = now.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+tickClocks();
+setInterval(tickClocks, 1000);
+
 const canvas = document.getElementById('plot');
 const ctx = canvas.getContext('2d');
 const maxSamples = 200;
@@ -134,6 +163,13 @@ function pushSample(s) {
 const feedbackContentWrapper = document.getElementById('feedback-content-wrapper');
 let feedbackTimeout;
 
+// Show INITIALIZING only for the first 3.5 s after page load, then go NOMINAL
+let isInitializing = true;
+setTimeout(() => {
+  isInitializing = false;
+  updateFeedback(null);
+}, 3500);
+
 // ... (existing code between)
 
 // Start the application
@@ -261,37 +297,44 @@ function resetConfidence() {
 // ... (existing printAnomalies and renderAnomalies functions)
 
 function updateFeedback(anomalyScore = null) {
-  clearTimeout(feedbackTimeout); // Clear any existing timeout
+  clearTimeout(feedbackTimeout);
 
-  if (!hasDataFromBackend) {
+  if (isInitializing) {
     feedbackContentWrapper.innerHTML = `
-            <div class="feedback-content">
-                <img src="./img/no-data.png" alt="No Data">
-                <p class="feedback-text">No data</p>
-            </div>
-        `;
+      <div class="status-badge status-offline">
+        <span class="status-icon">⏳</span>
+        <div class="status-details">
+          <span class="status-label">INITIALIZING</span>
+          <span class="status-sub">Starting up…</span>
+        </div>
+      </div>`;
     return;
   }
 
   if (anomalyScore !== null) {
-    // Anomaly detected
+    const isCritical = anomalyScore >= 5;
     feedbackContentWrapper.innerHTML = `
-            <div class="feedback-content">
-                <img src="./img/bad.svg" alt="Anomaly Detected">
-                <p class="feedback-text">Anomaly detected: ${anomalyScore.toFixed(2)}</p>
-            </div>
-        `;
-    feedbackTimeout = setTimeout(() => {
-      updateFeedback(null); // Reset after 3 seconds
-    }, 3000);
+      <div class="status-badge ${isCritical ? 'status-critical' : 'status-warning'}">
+        <span class="status-icon">${isCritical ? '🔴' : '⚠️'}</span>
+        <div class="status-details">
+          <span class="status-label">${isCritical ? 'CRITICAL' : 'ANOMALY DETECTED'}</span>
+          <span class="status-sub">Score: ${anomalyScore.toFixed(2)}${isCritical ? ' — Immediate attention required' : ''}</span>
+        </div>
+      </div>`;
+    // Update last anomaly stat
+    const now = new Date();
+    document.getElementById('stat-last-anomaly').textContent =
+      now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    feedbackTimeout = setTimeout(() => updateFeedback(null), 4000);
   } else {
-    // No anomaly or reset
     feedbackContentWrapper.innerHTML = `
-            <div class="feedback-content">
-                <img src="./img/good.svg" alt="No Anomalies">
-                <p class="feedback-text">No anomalies</p>
-            </div>
-        `;
+      <div class="status-badge status-nominal">
+        <span class="status-icon">🟢</span>
+        <div class="status-details">
+          <span class="status-label">NOMINAL</span>
+          <span class="status-sub">All systems operating normally</span>
+        </div>
+      </div>`;
   }
 }
 
@@ -369,3 +412,90 @@ function renderAccelerometerData() {
     noAccelerometerDataPlaceholder.style.display = 'flex'; // Use flex for centering content
   }
 }
+
+// ── Climate / Environment live charts ────────────────────────────────────────
+
+const MAX_CLIMATE_POINTS = 60; // keep last 60 seconds
+
+function newClimateChartData(borderColor, backgroundColor) {
+  return {
+    labels: [],
+    datasets: [{ data: [], borderColor, backgroundColor, fill: true, pointRadius: 0, borderWidth: 1.5 }],
+  };
+}
+
+function newClimateChart(ctx, obj) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: obj.data,
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        y: obj.unit === '%' ? { min: 0, max: 100, grid: { color: '#e8e8e544' } } : { grid: { color: '#e8e8e544' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } },
+      },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          callbacks: {
+            title: () => '',
+            label: ctx => `${ctx.label}  –  ${ctx.parsed.y.toFixed(1)} ${obj.unit}`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function pushClimatePoint(obj, message) {
+  const canvasEl = obj.canvas;
+  const noDataEl = document.getElementById(canvasEl.id + '-nodata');
+
+  // Update the big live-value display
+  if (obj.valueEl) obj.valueEl.textContent = message.value.toFixed(1);
+
+  const date = new Date(message.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  obj.data.labels.push(date);
+  obj.data.datasets[0].data.push(message.value);
+
+  if (obj.data.labels.length > MAX_CLIMATE_POINTS) {
+    obj.data.labels.shift();
+    obj.data.datasets[0].data.shift();
+  }
+
+  if (noDataEl) noDataEl.style.display = 'none';
+  canvasEl.style.display = 'block';
+
+  if (!obj.chart) {
+    obj.chart = newClimateChart(canvasEl.getContext('2d'), obj);
+  } else {
+    obj.chart.update();
+  }
+}
+
+const temperatureLive = {
+  canvas:  document.getElementById('temperature-live-chart'),
+  valueEl: document.getElementById('temp-value'),
+  chart: null,
+  data:  newClimateChartData('#f0b94d', 'rgba(240,185,77,0.10)'),
+  unit:  '°C',
+};
+
+const humidityLive = {
+  canvas:  document.getElementById('humidity-live-chart'),
+  valueEl: document.getElementById('hum-value'),
+  chart: null,
+  data:  newClimateChartData('#1f6f68', 'rgba(31,111,104,0.08)'),
+  unit:  '%',
+};
+
+// Hide canvases until first data arrives
+[temperatureLive, humidityLive].forEach(obj => {
+  if (obj.canvas) obj.canvas.style.display = 'none';
+});
+
+ui.on_message('temperature', msg => pushClimatePoint(temperatureLive, msg));
+ui.on_message('humidity',    msg => pushClimatePoint(humidityLive,    msg));

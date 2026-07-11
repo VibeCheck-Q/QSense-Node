@@ -3,7 +3,7 @@
 > Part of **QSense Factory** · Snapdragon Multiverse Hackathon  
 > Stage: **Detect** — the first node in the `Detect → Alert → Diagnose → Resolve` closed loop.
 
-![Vibration Monitoring](assets/docs_assets/vibration-anomaly.png)
+![Dashboard Screenshot](assets/docs_assets/dashboard-preview.png)
 
 ---
 
@@ -32,38 +32,101 @@ This repository contains the **Arduino UNO Q node** — the Detect stage. It ret
 ### What it does
 
 - Reads raw accelerometer data (X, Y, Z axes) from a **Modulino Movement** sensor at 62.5 Hz
+- Reads **temperature and humidity** from a **Modulino Thermo** sensor at 1 Hz
 - Runs a **vibration anomaly detection** model locally on the board
-- Streams live data to a real-time web dashboard over the local network
+- Streams live vibration and environment data to a real-time web dashboard
 - Fires an alert (with anomaly score + timestamp) when vibration deviates from the learned baseline
+- Publishes a structured **MQTT alert** (`machine/anomaly` topic) on every anomaly event
+- Triggers a **3-second buzzer alarm** via Modulino Buzzer when the anomaly score exceeds the critical threshold (≥ 5.0)
 - Accepts dynamic **threshold adjustments** from the dashboard without restarting
 - Exposes a **reset endpoint** so the Copilot+ PC can reset the baseline once a repair is confirmed
 
-### Architecture
+### App Flow
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                 Arduino UNO Q                       │
-│                                                     │
-│  sketch.ino  ──Bridge.notify──►  main.py            │
-│  (62.5 Hz IMU read)             │                   │
-│                                 ├─► VibrationAnomalyDetection Brick
-│                                 ├─► WebUI (live plot + controls)
-│                                 └─► anomaly_detected event ──► PC
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                          Arduino UNO Q                               │
+│                                                                      │
+│  ┌─ Modulino Movement ─┐   62.5 Hz    ┌─────────────────────────┐   │
+│  │  X / Y / Z accel    │──Bridge.notify─►  record_sensor_movement │   │
+│  └─────────────────────┘              │  • g → m/s² conversion   │   │
+│                                       │  • WebUI: live plot       │   │
+│  ┌─ Modulino Thermo ───┐    1 Hz      │  • VibrationAnomalyDetect │   │
+│  │  Temperature        │──Bridge.notify─►  record_sensor_samples  │   │
+│  │  Humidity           │              │  • WebUI: temp / humidity │   │
+│  └─────────────────────┘              └────────────┬────────────┘   │
+│                                                    │                 │
+│                                         on_detected_anomaly()        │
+│                                                    │                 │
+│                              ┌─────────────────────┼──────────────┐ │
+│                              │  score < 5.0         │  score ≥ 5.0 │ │
+│                              ▼                      ▼              │ │
+│                         ⚠️ ANOMALY            🔴 CRITICAL          │ │
+│                         WebUI badge           WebUI badge          │ │
+│                         MQTT publish          MQTT publish         │ │
+│                                               Bridge.call ──────► │ │
+│                                               Modulino Buzzer      │ │
+│                                               3-sec alarm tone     │ │
+│                              └──────────────────────────────────┘  │ │
+└──────────────────────────────────────────────────────────────────────┘
+                    │ MQTT
+                    ▼
+           broker (machine/anomaly)
+           {alertId, machineNo, partName, partNo, severity, timestamp}
+                    │
+                    ▼
+           Copilot+ PC / any MQTT subscriber
 ```
+
+### MQTT Alert Payload
+
+Every anomaly (regardless of severity) publishes to `machine/anomaly`:
+
+```json
+{
+  "alertId":   "a3f1c842-...",
+  "machineNo": "M-01",
+  "partName":  "Fan Motor",
+  "partNo":    "PN-001",
+  "severity":  1.2345,
+  "timestamp": "2026-07-12T01:20:30.123456"
+}
+```
+
+Configure broker, topic, and machine details at the top of `python/main.py`:
+
+```python
+MQTT_BROKER = "localhost"
+MQTT_PORT   = 1883
+MQTT_TOPIC  = "machine/anomaly"
+MACHINE_NO  = "M-01"
+PART_NAME   = "Fan Motor"
+PART_NO     = "PN-001"
+```
+
+### Alarm Severity Levels
+
+| Score | Status | Dashboard | Buzzer |
+|---|---|---|---|
+| — | ⏳ INITIALIZING | Grey | Silent |
+| Any | 🟢 NOMINAL | Sage green | Silent |
+| < 5.0 | ⚠️ ANOMALY DETECTED | Amber | Silent |
+| ≥ 5.0 | 🔴 CRITICAL | Coral red | 3-second 1 kHz tone |
 
 ---
 
 ## Hardware Requirements
 
-| Component | Quantity |
-|---|---|
-| Arduino UNO Q (or Arduino VENTUNO Q) | 1 |
-| Modulino Movement (LSM6DSOX IMU) | 1 |
-| Qwiic Cable | 1 |
-| USB-C to USB-A Cable | 1 |
+| Component | Purpose | Quantity |
+|---|---|---|
+| Arduino UNO Q (or Arduino VENTUNO Q) | Main compute board | 1 |
+| Modulino Movement (LSM6DSOX IMU) | Vibration / accelerometer | 1 |
+| Modulino Thermo (HS300x) | Temperature + Humidity | 1 |
+| Modulino Buzzer | Critical alarm output | 1 |
+| Qwiic Cables | Sensor interconnect | 3 |
+| USB-C to USB-A Cable | Power + serial | 1 |
 
-Mount the sensor magnetically onto the motor casing — no invasive modification required.
+Mount the Movement module magnetically onto the motor casing — no invasive modification required. The Thermo module can be placed nearby to monitor ambient conditions around the machine.
 
 ---
 
@@ -95,19 +158,37 @@ qsense-node/
 
 ---
 
+## CLI Quick Reference
+
+The app ID is `user:qsense-machine-monitoring`.
+
+| Action | Command |
+|---|---|
+| **Start** | `arduino-app-cli app start user:qsense-machine-monitoring` |
+| **Stop** | `arduino-app-cli app stop user:qsense-machine-monitoring` |
+| **Restart** *(after code changes)* | `arduino-app-cli app restart user:qsense-machine-monitoring` |
+| **Watch live logs** | `arduino-app-cli app logs user:qsense-machine-monitoring` |
+| **Check status of all apps** | `arduino-app-cli app list` |
+
+> Add `-v` to any command for verbose output, e.g. `arduino-app-cli app start user:qsense-machine-monitoring -v`
+
+---
+
 ## How to Run
 
 1. **Connect hardware**  
-   Plug the Modulino Movement into the Arduino UNO Q via the Qwiic connector.
+   Plug the Modulino Movement and Modulino Thermo into the Arduino UNO Q via the Qwiic connector. Attach the Modulino Buzzer for critical alarm output.
 
-2. **Deploy via Arduino App Lab**  
-   Open the project in App Lab and flash + run it on the board.
+2. **Start the app via CLI**  
+   ```bash
+   arduino-app-cli app start user:qsense-machine-monitoring
+   ```
 
 3. **Open the dashboard**  
    Navigate to `http://<UNO-Q-IP-ADDRESS>:7000` from any browser on the same network.
 
 4. **Monitor**  
-   The **Accelerometer Data** chart shows live X/Y/Z waveforms. Mount the sensor on a motor or fan to see real vibration patterns.
+   The **Machine Faults** chart shows live X/Y/Z vibration waveforms. The **Environment** row shows live Temperature and Humidity from the Thermo module.
 
 5. **Tune sensitivity**  
    Use the **Anomaly Threshold** slider.  
@@ -117,7 +198,7 @@ qsense-node/
    - Use the numeric input for scores above the slider range (>20).
 
 6. **Trigger a test anomaly**  
-   Shake the sensor by hand. The **Status** panel will flag the event and log it in **Recent Anomalies** with a timestamp and score.
+   Shake the sensor by hand. The **Machine Status** panel will switch to ⚠️ ANOMALY DETECTED and log it in **Recent Anomalies** with a score and timestamp. If the score exceeds **5.0** (Critical), the status switches to 🔴 CRITICAL and the buzzer fires a 3-second alarm tone.
 
 ---
 
@@ -125,37 +206,69 @@ qsense-node/
 
 ### Firmware — `sketch.ino`
 
-Runs a timed loop at 16 ms intervals (62.5 Hz). Reads X, Y, Z acceleration from the LSM6DSOX IMU and sends values to the Python layer via `Bridge.notify`.
+Runs two independent timed loops:
+
+- **62.5 Hz** — reads X/Y/Z from the LSM6DSOX IMU → `Bridge.notify("record_sensor_movement")`
+- **1 Hz** — reads temperature + humidity from the HS300x → `Bridge.notify("record_sensor_samples")`
+- Registers `triggerAlertBuzzer()` as a Bridge-callable so Python can fire the buzzer remotely
 
 ```cpp
-void loop() {
-  if (currentMillis - previousMillis >= interval) {
-    has_movement = movement.update();
-    if (has_movement == 1) {
-      x_accel = movement.getX();
-      y_accel = movement.getY();
-      z_accel = movement.getZ();
-      Bridge.notify("record_sensor_movement", x_accel, y_accel, z_accel);
-    }
-  }
+// Accelerometer — 62.5 Hz
+if (currentMillis - previousMillis >= interval) {
+  has_movement = movement.update();
+  if (has_movement == 1)
+    Bridge.notify("record_sensor_movement", movement.getX(), movement.getY(), movement.getZ());
+}
+
+// Temperature & Humidity — 1 Hz
+if (currentMillis - previousMillisThermo >= intervalThermo) {
+  Bridge.notify("record_sensor_samples", thermo.getTemperature(), thermo.getHumidity());
+}
+
+// Buzzer handler — called by Python on critical anomaly
+void triggerAlertBuzzer() {
+  buzzer.tone(1000, 3000); // 1 kHz for 3 seconds
 }
 ```
 
 ### Backend — `main.py`
 
-Receives IMU data via Bridge RPC, converts from g to m/s², feeds the detection brick, and pushes events to the WebUI.
+**Vibration path** — receives IMU data, converts g → m/s², feeds the anomaly detection brick, and pushes the live waveform to the dashboard:
 
 ```python
-def record_sensor_movement(x: float, y: float, z: float):
+def record_sensor_movement(x, y, z):
     x_ms2, y_ms2, z_ms2 = x * 9.81, y * 9.81, z * 9.81
     ui.send_message('sample', {'x': x_ms2, 'y': y_ms2, 'z': z_ms2})
     vibration_detection.accumulate_samples((x_ms2, y_ms2, z_ms2))
 ```
 
-Dynamic threshold updates from the slider arrive as a WebUI message and are applied immediately:
+**Environment path** — receives temperature and humidity, forwards to dashboard:
 
 ```python
-def on_override_th(value: float):
+def record_sensor_samples(celsius, humidity):
+    ts = int(datetime.now().timestamp() * 1000)
+    ui.send_message('temperature', {"value": round(celsius, 2), "ts": ts})
+    ui.send_message('humidity',    {"value": round(humidity, 2), "ts": ts})
+```
+
+**Anomaly path** — on every detected anomaly:
+1. Pushes the event to the dashboard (score + timestamp)
+2. Publishes a structured MQTT alert
+3. If score ≥ 5.0 (Critical) → calls `Bridge.call("trigger_alert_buzzer")` to fire the 3-second alarm
+
+```python
+def on_detected_anomaly(anomaly_score, classification):
+    timestamp = datetime.now().isoformat()
+    ui.send_message('anomaly_detected', json.dumps({"score": anomaly_score, "timestamp": timestamp}))
+    publish_mqtt_alert(anomaly_score, timestamp)
+    if anomaly_score >= CRITICAL_SCORE_THRESHOLD:   # 5.0
+        Bridge.call("trigger_alert_buzzer")
+```
+
+**Threshold control** — slider changes arrive as WebUI messages and apply immediately without restart:
+
+```python
+def on_override_th(value):
     vibration_detection.anomaly_detection_threshold = value
 ```
 
@@ -163,12 +276,18 @@ def on_override_th(value: float):
 
 Built with the **QSense Factory design system (v2 — light/minimal)**:
 
-- **Clash Display** for headlines and anomaly scores
-- **Satoshi** for body text and labels
-- Pipeline stage colours: Coral `#EA6F56` (Detect) · Amber `#F0B94D` (Alert) · Slate `#445067` (Diagnose) · Sage `#6FA980` (Resolve)
-- HTML5 Canvas scrolling chart for live X/Y/Z waveforms
-- Real-time anomaly list with score, label, and timestamp
-- Full-round pill slider for threshold control
+| Section | Content |
+|---|---|
+| **Stats bar** | Machine ID · Placement · Run-time · Last Anomaly · Live Date & Time |
+| **Machine Faults** | Full-width live X/Y/Z waveform (HTML5 Canvas, 200 pts rolling) |
+| **Machine Status** | Industrial badge — 🟢 NOMINAL / ⚠️ ANOMALY / 🔴 CRITICAL |
+| **Anomaly Threshold** | Pill slider (0–20+) with live numeric input and reset |
+| **Recent Anomalies** | Last 5 events — score, label, timestamp (scrollable) |
+| **Temperature** | Live big-number display + Chart.js sparkline |
+| **Humidity** | Live big-number display + Chart.js sparkline |
+
+Design tokens: Coral `#EA6F56` · Amber `#F0B94D` · Slate `#445067` · Sage `#6FA980`  
+Fonts: **Clash Display** (headlines, scores) · **Satoshi** (body, labels)
 
 ---
 

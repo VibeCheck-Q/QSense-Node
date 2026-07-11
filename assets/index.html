@@ -22,21 +22,50 @@ SPDX-License-Identifier: MPL-2.0
           <span class="qs-stage-badge qs-detect">Detect</span>
         </div>
         <span class="qs-header-subtitle">Machine Monitor</span>
-        <img class="arduino-logo" src="./img/RGB-Arduino-Logo_Color Inline Loop.svg" alt="Arduino Logo" />
+        <img class="arduino-logo" src="./img/qsense-badge.svg" alt="QSense Logo" />
       </header>
 
+      <!-- ── Machine stats bar ── -->
+      <div class="qs-stats-bar">
+        <div class="qs-stat-item">
+          <span class="qs-stat-label">Machine ID</span>
+          <span class="qs-stat-value" id="stat-machine-id">—</span>
+        </div>
+        <div class="qs-stat-sep"></div>
+        <div class="qs-stat-item">
+          <span class="qs-stat-label">Placement</span>
+          <span class="qs-stat-value" id="stat-placement">—</span>
+        </div>
+        <div class="qs-stat-sep"></div>
+        <div class="qs-stat-item">
+          <span class="qs-stat-label">Run-time</span>
+          <span class="qs-stat-value qs-mono" id="stat-runtime">00:00:00</span>
+        </div>
+        <div class="qs-stat-sep"></div>
+        <div class="qs-stat-item">
+          <span class="qs-stat-label">Last Anomaly</span>
+          <span class="qs-stat-value qs-mono" id="stat-last-anomaly">—</span>
+        </div>
+        <div class="qs-stat-sep"></div>
+        <div class="qs-stat-item qs-stat-item-clock">
+          <span class="qs-stat-label">Date &amp; Time</span>
+          <span class="qs-stat-value qs-mono" id="stat-datetime">—</span>
+        </div>
+      </div>
+
+      <!-- ── Row 1: Machine Faults chart (left) + Status & Threshold (right) ── -->
       <div class="main-content">
-        <div class="controls-section-left qs-card">
+
+        <div class="qs-card machine-faults-card">
           <div class="box-title-row">
             <div class="box-title">
               <span class="qs-dot qs-dot-detect"></span>
-              Accelerometer Data
+              Machine Faults
               <span class="qs-unit">(m/s²)</span>
             </div>
             <img src="./img/info.svg" alt="Info" class="info-btn accelerometer-data" />
             <div class="popover">
-              Live visualization of raw accelerometer data (X, Y, Z axes) from the board's Movement module. Horizontal
-              axis represents time; vertical axis shows acceleration in m/s<sup>2</sup>.
+              Live vibration data (X, Y, Z axes) from the Movement module. Anomaly detection flags deviations from the normal baseline.
             </div>
           </div>
 
@@ -44,16 +73,13 @@ SPDX-License-Identifier: MPL-2.0
             <canvas id="plot"></canvas>
             <div class="legend">
               <div class="legend-item">
-                <div class="legend-color" style="background-color: #0068c9"></div>
-                <span>X</span>
+                <div class="legend-color" style="background-color: #0068c9"></div><span>X</span>
               </div>
               <div class="legend-item">
-                <div class="legend-color" style="background-color: #ff9900"></div>
-                <span>Y</span>
+                <div class="legend-color" style="background-color: #ff9900"></div><span>Y</span>
               </div>
               <div class="legend-item">
-                <div class="legend-color" style="background-color: #ff2b2b"></div>
-                <span>Z</span>
+                <div class="legend-color" style="background-color: #ff2b2b"></div><span>Z</span>
               </div>
             </div>
           </div>
@@ -64,7 +90,15 @@ SPDX-License-Identifier: MPL-2.0
           </div>
         </div>
 
-        <div class="right-column">
+        <div class="right-panel">
+
+          <div class="qs-card">
+            <div id="feedback-section" class="feedback-section">
+              <div class="box-title" style="margin-bottom: 12px">Machine Status</div>
+              <div id="feedback-content-wrapper"></div>
+            </div>
+          </div>
+
           <div class="qs-card">
             <div class="controls-section">
               <div class="control-group">
@@ -98,27 +132,57 @@ SPDX-License-Identifier: MPL-2.0
             </div>
           </div>
 
-          <div class="qs-card">
-            <div id="feedback-section" class="feedback-section">
-              <div class="box-title" style="margin-bottom: 12px">Status</div>
-              <div id="feedback-content-wrapper"></div>
-            </div>
-          </div>
+        </div>
+      </div>
 
-          <div class="qs-card qs-card-grow">
-            <div class="recent-detections-section">
-              <div class="recent-scans-title-container">
-                <div class="box-title" style="margin-bottom: 0">Recent Anomalies</div>
-              </div>
-              <ul id="recentClassifications"></ul>
+      <!-- ── Row 2: Recent Anomalies | Temperature | Humidity  (equal thirds) ── -->
+      <div class="env-row">
+
+        <div class="qs-card">
+          <div class="recent-detections-section">
+            <div class="recent-scans-title-container">
+              <div class="box-title" style="margin-bottom: 0">Recent Anomalies</div>
             </div>
+            <ul id="recentClassifications"></ul>
           </div>
         </div>
+
+        <div class="qs-card env-card env-card-temp">
+          <div class="box-title">
+            <span class="qs-dot" style="background:#f0b94d"></span>
+            Temperature <span class="qs-unit">(°C)</span>
+          </div>
+          <div class="env-reading">
+            <span class="env-value env-value-temp" id="temp-value">—</span>
+            <span class="env-unit-badge">°C</span>
+          </div>
+          <canvas id="temperature-live-chart"></canvas>
+          <div id="temperature-live-chart-nodata" class="no-data-placeholder env-nodata">
+            <img src="./img/no-data.png" alt="No data" /><p>Waiting for sensor data…</p>
+          </div>
+        </div>
+
+        <div class="qs-card env-card env-card-hum">
+          <div class="box-title">
+            <span class="qs-dot" style="background:#1f6f68"></span>
+            Humidity <span class="qs-unit">(%)</span>
+          </div>
+          <div class="env-reading">
+            <span class="env-value env-value-hum" id="hum-value">—</span>
+            <span class="env-unit-badge">%</span>
+          </div>
+          <canvas id="humidity-live-chart"></canvas>
+          <div id="humidity-live-chart-nodata" class="no-data-placeholder env-nodata">
+            <img src="./img/no-data.png" alt="No data" /><p>Waiting for sensor data…</p>
+          </div>
+        </div>
+
       </div>
 
       <div id="error-container" class="error-message" style="display: none"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="libs/socket.io.min.js"></script>
     <script src="libs/arduino.js"></script>
     <script src="app.js"></script>
