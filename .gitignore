@@ -1,0 +1,24 @@
+# Build cache & compiled artifacts
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Cursor / editor design skill files (binary)
+*.skill
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arduino build outputs
+*.bin
+*.elf
+*.hex
+*.map

@@ -1,0 +1,126 @@
+<!--
+SPDX-FileCopyrightText: Copyright (C) Arduino s.r.l. and/or its affiliated companies
+
+SPDX-License-Identifier: MPL-2.0
+-->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QSense Factory — Vibration Monitor</title>
+    <link rel="icon" type="image/png" href="./img/favicon.png" />
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=satoshi@400,500,600,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div class="qs-app">
+      <header class="qs-header">
+        <div class="qs-header-left">
+          <div class="qs-wordmark">QSense Factory</div>
+          <span class="qs-stage-badge qs-detect">Detect</span>
+        </div>
+        <span class="qs-header-subtitle">Vibration Anomaly Monitor</span>
+        <img class="arduino-logo" src="./img/RGB-Arduino-Logo_Color Inline Loop.svg" alt="Arduino Logo" />
+      </header>
+
+      <div class="main-content">
+        <div class="controls-section-left qs-card">
+          <div class="box-title-row">
+            <div class="box-title">
+              <span class="qs-dot qs-dot-detect"></span>
+              Accelerometer Data
+              <span class="qs-unit">(m/s²)</span>
+            </div>
+            <img src="./img/info.svg" alt="Info" class="info-btn accelerometer-data" />
+            <div class="popover">
+              Live visualization of raw accelerometer data (X, Y, Z axes) from the board's Movement module. Horizontal
+              axis represents time; vertical axis shows acceleration in m/s<sup>2</sup>.
+            </div>
+          </div>
+
+          <div id="accelerometer-data-display">
+            <canvas id="plot"></canvas>
+            <div class="legend">
+              <div class="legend-item">
+                <div class="legend-color" style="background-color: #0068c9"></div>
+                <span>X</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff9900"></div>
+                <span>Y</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff2b2b"></div>
+                <span>Z</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="no-accelerometer-data" class="no-data-placeholder">
+            <img src="./img/no-data.png" alt="No data" />
+            <p>Waiting for sensor data…</p>
+          </div>
+        </div>
+
+        <div class="right-column">
+          <div class="qs-card">
+            <div class="controls-section">
+              <div class="control-group">
+                <div class="control-confidence">
+                  <div class="box-title-row">
+                    <label id="confidence-label" for="confidenceSlider" class="box-title" style="margin-bottom: 0">
+                      Anomaly Threshold
+                    </label>
+                    <img src="./img/info.svg" alt="Info" class="info-btn confidence" />
+                    <div class="popover">
+                      It quantifies how far the current vibration is from the model's 'normal' clusters.<br /><br />
+                      Scores above your threshold are flagged as an anomaly. This value is an anomaly score, not a 0–1
+                      confidence. Use the numeric input for values above the slider range.
+                    </div>
+                  </div>
+                  <button id="confidenceResetButton" class="btn-tertiary">
+                    <input type="number" id="confidenceInput" class="confidence-input" min="0" step="0.1" value="1.0" />
+                    <img src="img/reset.svg" alt="Reset" class="reset-icon" />
+                  </button>
+                </div>
+                <div class="slider-box">
+                  <span class="confidence-limits">0</span>
+                  <div class="slider-container">
+                    <div class="slider-progress" id="sliderProgress"></div>
+                    <div class="confidence-value-display" id="confidenceValueDisplay">1.0</div>
+                    <input type="range" id="confidenceSlider" min="0" max="20" step="0.1" value="1.0" />
+                  </div>
+                  <span class="confidence-limits">20+</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="qs-card">
+            <div id="feedback-section" class="feedback-section">
+              <div class="box-title" style="margin-bottom: 12px">Status</div>
+              <div id="feedback-content-wrapper"></div>
+            </div>
+          </div>
+
+          <div class="qs-card qs-card-grow">
+            <div class="recent-detections-section">
+              <div class="recent-scans-title-container">
+                <div class="box-title" style="margin-bottom: 0">Recent Anomalies</div>
+              </div>
+              <ul id="recentClassifications"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="error-container" class="error-message" style="display: none"></div>
+    </div>
+
+    <script src="libs/socket.io.min.js"></script>
+    <script src="libs/arduino.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

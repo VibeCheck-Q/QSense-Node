@@ -1,0 +1,635 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (C) Arduino s.r.l. and/or its affiliated companies
+ *
+ * SPDX-License-Identifier: MPL-2.0
+ */
+
+/* -----------------------------------------------
+   QSense Factory Design System — v2 (light/minimal)
+   Tokens: Detect=Coral · Alert=Amber · Diagnose=Slate · Resolve=Sage
+----------------------------------------------- */
+:root {
+  --bg:          #ffffff;
+  --bg-soft:     #f7f7f6;
+  --sidebar:     #f5f5f4;
+  --border:      #e8e8e5;
+  --ink:         #17191c;
+  --ink-soft:    #6b6e72;
+  --ink-faint:   #9a9da0;
+  --navy:        #1e2a38;
+  --teal-cta:    #1f6f68;
+
+  /* Pipeline stage colours */
+  --coral:       #ea6f56;
+  --coral-soft:  #fbe6e0;
+  --amber:       #f0b94d;
+  --amber-soft:  #fcf1dc;
+  --slate:       #445067;
+  --slate-soft:  #e8eaef;
+  --sage:        #6fa980;
+  --sage-soft:   #e6f1e9;
+
+  /* Radius scale */
+  --r-lg:   18px;
+  --r-md:   10px;
+  --r-sm:   8px;
+  --r-full: 999px;
+
+  /* Shadow */
+  --shadow: 0 1px 2px rgba(23,25,28,.04), 0 1px 12px rgba(23,25,28,.03);
+}
+
+@import url('fonts/fonts.css');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--bg-soft);
+  line-height: 1.6;
+  color: var(--ink);
+  padding: 28px 40px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* -----------------------------------------------
+   App shell
+----------------------------------------------- */
+.qs-app {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* -----------------------------------------------
+   Header
+----------------------------------------------- */
+.qs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.qs-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qs-wordmark {
+  font-family: 'Clash Display', 'Roboto Mono', monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.qs-header-subtitle {
+  font-family: 'Satoshi', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.arduino-logo {
+  height: 30px;
+  width: auto;
+}
+
+/* -----------------------------------------------
+   Stage badge & dot
+----------------------------------------------- */
+.qs-stage-badge {
+  font-family: 'Satoshi', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.qs-detect { background: var(--coral-soft); color: #b5442c; }
+.qs-alert  { background: var(--amber-soft); color: #93650e; }
+.qs-slate  { background: var(--slate-soft); color: var(--slate); }
+.qs-resolve{ background: var(--sage-soft);  color: #2f6b49; }
+
+.qs-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.qs-dot-detect { background: var(--coral); }
+.qs-dot-alert  { background: var(--amber); }
+.qs-dot-resolve{ background: var(--sage);  }
+
+/* -----------------------------------------------
+   Cards
+----------------------------------------------- */
+.qs-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.qs-card-grow {
+  flex: 1;
+}
+
+/* -----------------------------------------------
+   Layout
+----------------------------------------------- */
+.main-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.controls-section-left {
+  min-width: 750px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+}
+
+/* -----------------------------------------------
+   Box title & title row
+----------------------------------------------- */
+.box-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.box-title {
+  color: var(--ink);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.qs-unit {
+  color: var(--ink-soft);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
+/* -----------------------------------------------
+   Legend
+----------------------------------------------- */
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* -----------------------------------------------
+   Chart canvas
+----------------------------------------------- */
+#accelerometer-data-display {
+  margin-top: 16px;
+}
+
+#plot {
+  width: 100%;
+  height: 250px;
+}
+
+/* -----------------------------------------------
+   Empty / no-data states
+----------------------------------------------- */
+.no-data-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 220px;
+  color: var(--ink-faint);
+  gap: 10px;
+}
+
+.no-data-placeholder p {
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.no-recent-anomalies {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 0 12px;
+  color: var(--ink-faint);
+  gap: 10px;
+}
+
+.no-recent-anomalies p {
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* -----------------------------------------------
+   Feedback section
+----------------------------------------------- */
+.feedback-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.feedback-text {
+  font-family: 'Satoshi', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+/* -----------------------------------------------
+   Threshold / slider controls
+----------------------------------------------- */
+.control-group {
+  position: relative;
+}
+
+.control-confidence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.slider-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-container {
+  position: relative;
+  width: 100%;
+  min-height: 40px;
+}
+
+.slider-progress {
+  display: none;
+}
+
+#confidenceSlider {
+  width: 100%;
+  height: 32px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--teal-cta) 0%,
+    var(--teal-cta) var(--slider-progress, 0%),
+    var(--border) var(--slider-progress, 0%),
+    var(--border) 100%
+  );
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 6px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  z-index: 2;
+  margin: 8px 0 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+#confidenceSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal-cta);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  position: relative;
+  margin-top: -4px;
+  z-index: 2;
+}
+
+#confidenceSlider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: transparent;
+}
+
+#confidenceSlider::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: transparent;
+  border: none;
+}
+
+#confidenceSlider::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--teal-cta);
+}
+
+.confidence-value-display {
+  position: absolute;
+  top: -3px;
+  transform: translateX(-50%);
+  color: var(--teal-cta);
+  padding: 2px 6px;
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+  transition: left 0.1s ease;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.confidence-limits {
+  color: var(--ink-soft);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+
+/* -----------------------------------------------
+   Buttons
+----------------------------------------------- */
+.btn-tertiary {
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  font-size: 12px;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 500;
+  color: var(--ink);
+  min-width: 54px;
+  height: 34px;
+}
+
+.btn-tertiary:hover {
+  border-color: var(--teal-cta);
+  color: var(--teal-cta);
+}
+
+.confidence-input {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Satoshi', sans-serif;
+  color: inherit;
+  text-align: center;
+  width: 38px;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  cursor: text;
+}
+
+.confidence-input:focus {
+  background: rgba(31, 111, 104, 0.08);
+  border-radius: 4px;
+}
+
+.reset-icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-tertiary:hover .reset-icon {
+  opacity: 0.9;
+}
+
+/* -----------------------------------------------
+   Info button & popover
+----------------------------------------------- */
+.info-btn {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  background-color: var(--border);
+  padding: 2px;
+  transition: background 0.2s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.info-btn:hover {
+  background-color: var(--ink-faint);
+}
+
+.popover {
+  position: absolute;
+  left: 5%;
+  top: calc(100% + 8px);
+  display: none;
+  background: var(--bg);
+  padding: 14px 18px;
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 20px rgba(23,25,28,.1);
+  border: 1px solid var(--border);
+  z-index: 10;
+  width: 300px;
+  color: var(--ink-soft);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.65;
+}
+
+.popover.active {
+  display: block;
+}
+
+/* -----------------------------------------------
+   Recent anomalies list
+----------------------------------------------- */
+.recent-scans-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#recentClassifications {
+  list-style-type: none;
+  padding: 0;
+  flex: 1;
+  margin-top: 8px;
+}
+
+.anomaly-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+
+.anomaly-list-item:last-child {
+  border-bottom: none;
+}
+
+.anomaly-score {
+  font-family: 'Clash Display', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--coral);
+  min-width: 32px;
+}
+
+.anomaly-text {
+  color: var(--ink);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.anomaly-time {
+  color: var(--ink-soft);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* -----------------------------------------------
+   Error banner
+----------------------------------------------- */
+.error-message {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  background-color: var(--coral-soft);
+  color: #b5442c;
+  border: 1px solid rgba(234,111,86,.25);
+  font-family: 'Satoshi', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* -----------------------------------------------
+   Responsive
+----------------------------------------------- */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .controls-section-left {
+    min-width: 490px;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 16px 20px;
+  }
+
+  .main-content {
+    flex-direction: column;
+  }
+
+  .right-column {
+    max-width: 100%;
+  }
+
+  .qs-wordmark {
+    font-size: 17px;
+  }
+
+  .qs-header-subtitle {
+    display: none;
+  }
+
+  .controls-section-left {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .arduino-logo {
+    height: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 12px 16px;
+  }
+
+  .controls-section-left {
+    min-width: unset;
+  }
+}

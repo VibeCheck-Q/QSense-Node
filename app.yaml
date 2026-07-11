@@ -1,0 +1,7 @@
+name: "QSense- Machine Vibration Monitoring"
+description: Monitor machine vibrations and detect anomalies
+ports: []
+bricks:
+- arduino:web_ui: {}
+- arduino:vibration_anomaly_detection: {}
+icon: 🌀
