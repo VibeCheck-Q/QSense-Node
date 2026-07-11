@@ -1,4 +1,4 @@
-name: "QSense- Machine Vibration Monitoring"
+name: "QSense- Machine Monitoring"
 description: Monitor machine vibrations and detect anomalies
 ports: []
 bricks:

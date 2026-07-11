@@ -1,4 +1,4 @@
-# QSense Node — Machine Vibration Monitor
+# QSense Node — Machine Monitor
 
 > Part of **QSense Factory** · Snapdragon Multiverse Hackathon  
 > Stage: **Detect** — the first node in the `Detect → Alert → Diagnose → Resolve` closed loop.
