@@ -8,15 +8,16 @@ import paho.mqtt.client as mqtt
 from arduino.app_utils import *
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_bricks.vibration_anomaly_detection import VibrationAnomalyDetection
+import db
 
 logger = Logger("vibration-detector")
 
 # --- MQTT Configuration ---
-MQTT_BROKER    = "test.mosquitto.org"
-MQTT_PORT      = 1883
+MQTT_BROKER        = "test.mosquitto.org"
+MQTT_PORT          = 1883
 MQTT_TOPIC         = "qsense/machine/monitoring"  # outbound: full anomaly alerts
-MQTT_ANOMALY_TOPIC = "qsense/machine/anomaly"    # outbound: non-critical anomaly notify
-MQTT_ACK_TOPIC     = "qsense/machine/ack"        # bidirectional: critical resolved=0/1
+MQTT_ANOMALY_TOPIC = "qsense/machine/anomaly"     # outbound: non-critical anomaly notify
+MQTT_ACK_TOPIC     = "qsense/machine/ack"         # bidirectional: critical resolved=0/1
 
 # --- Machine / Part Info ---
 MACHINE_NO = "M-01"
@@ -29,6 +30,14 @@ PART_NO    = "PN-001"
 ALERT_ID = "M-01"
 
 CRITICAL_SCORE_THRESHOLD = 5.0  # matches the UI critical boundary
+
+# ---------------------------------------------------------------------------
+# DB init — record run start time
+# ---------------------------------------------------------------------------
+
+db.init_db()
+db.set_metadata("run_start_time", datetime.now().isoformat())
+logger.info("SQLite cache initialised")
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +99,22 @@ vibration_detection = VibrationAnomalyDetection(anomaly_detection_threshold=1.0)
 ui = WebUI()
 
 
+def on_ui_connect(sid):
+    """Send cached history to a newly connected dashboard client."""
+    recent     = db.get_recent_anomalies(limit=5)
+    latest_env = db.get_latest_environment()
+    meta       = db.get_all_metadata()
+
+    ui.send_message('history', {
+        "anomalies":   recent,
+        "environment": latest_env,
+        "metadata":    meta,
+    })
+
+
+ui.on_connect(on_ui_connect)
+
+
 def on_override_th(value: float):
     try:
         vibration_detection.anomaly_detection_threshold = value
@@ -104,6 +129,10 @@ ui.on_message("override_th", lambda sid, threshold: on_override_th(threshold))
 
 def on_detected_anomaly(anomaly_score: float, classification: dict):
     timestamp = datetime.now().isoformat()
+    severity  = "critical" if anomaly_score >= CRITICAL_SCORE_THRESHOLD else "anomaly"
+
+    # Persist to DB
+    db.record_anomaly(anomaly_score, severity, timestamp)
 
     # Push event to dashboard
     ui.send_message('anomaly_detected', json.dumps({"score": anomaly_score, "timestamp": timestamp}))
@@ -165,7 +194,12 @@ Bridge.provide("record_sensor_movement", record_sensor_movement)
 def record_sensor_samples(celsius: float, humidity: float):
     if celsius is None or humidity is None:
         return
-    ts = int(datetime.now().timestamp() * 1000)
+    ts        = int(datetime.now().timestamp() * 1000)
+    timestamp = datetime.now().isoformat()
+
+    # Persist to DB
+    db.record_environment(celsius, humidity, timestamp)
+
     ui.send_message('temperature', {"value": round(float(celsius), 2), "ts": ts})
     ui.send_message('humidity',    {"value": round(float(humidity), 2), "ts": ts})
 

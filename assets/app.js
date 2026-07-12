@@ -10,9 +10,9 @@ const MACHINE_PLACEMENT = 'Zone A — Line 3';
 document.getElementById('stat-machine-id').textContent = MACHINE_ID;
 document.getElementById('stat-placement').textContent  = MACHINE_PLACEMENT;
 
-// Live run-time counter
-const runtimeStart  = Date.now();
-const runtimeEl     = document.getElementById('stat-runtime');
+// Live run-time counter — updated to server start time when history arrives
+let   runtimeStartMs = Date.now();
+const runtimeEl      = document.getElementById('stat-runtime');
 function padTwo(n) { return String(n).padStart(2, '0'); }
 
 // Live date & time clock
@@ -20,7 +20,7 @@ const datetimeEl = document.getElementById('stat-datetime');
 function tickClocks() {
   const now = new Date();
   // Runtime
-  const s = Math.floor((now - runtimeStart) / 1000);
+  const s = Math.floor((now - runtimeStartMs) / 1000);
   runtimeEl.textContent = `${padTwo(Math.floor(s / 3600))}:${padTwo(Math.floor((s % 3600) / 60))}:${padTwo(s % 60)}`;
   // Date & time
   datetimeEl.textContent = now.toLocaleString('en-GB', {
@@ -57,14 +57,53 @@ const ui = new WebUI();
 ui.on_connect(onUIConnected);
 ui.on_disconnect(onUIDisconnected);
 ui.on_message('anomaly_detected', handleAnomalyDetected);
-ui.on_message('sample', s => {
-  pushSample(s);
-});
+ui.on_message('sample', s => { pushSample(s); });
+ui.on_message('history', handleHistory);
 
 function onUIConnected() {
   if (errorContainer) {
     errorContainer.style.display = 'none';
     errorContainer.textContent = '';
+  }
+}
+
+function handleHistory(data) {
+  // Restore recent anomalies
+  if (data.anomalies && data.anomalies.length > 0) {
+    anomalies = data.anomalies.map(a =>
+      JSON.stringify({ score: a.score, timestamp: a.timestamp })
+    );
+    hasDataFromBackend = true;
+    renderAnomalies();
+    renderAccelerometerData();
+  }
+
+  // Restore last anomaly time in stats bar
+  if (data.metadata && data.metadata.last_anomaly_time) {
+    const d = new Date(data.metadata.last_anomaly_time);
+    const statEl = document.getElementById('stat-last-anomaly');
+    if (statEl) {
+      statEl.textContent = d.toLocaleTimeString('it-IT', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+  }
+
+  // Restore run-time baseline from server start time
+  if (data.metadata && data.metadata.run_start_time) {
+    const serverStart = new Date(data.metadata.run_start_time).getTime();
+    // Offset the existing runtime counter to account for time already elapsed
+    runtimeStartMs = serverStart;
+  }
+
+  // Restore latest temperature and humidity readings
+  if (data.environment) {
+    const env = data.environment;
+    const ts  = new Date(env.timestamp).getTime();
+    if (typeof pushClimatePoint === 'function') {
+      pushClimatePoint(tempLive,  { value: env.temperature, ts });
+      pushClimatePoint(humidLive, { value: env.humidity,    ts });
+    }
   }
 }
 
