@@ -170,6 +170,15 @@ setTimeout(() => {
   updateFeedback(null);
 }, 3500);
 
+// When true, the CRITICAL badge is locked — it will NOT auto-reset to NOMINAL.
+// Only cleared when machine_resolved is received from Python (MQTT ack resolved=1).
+let criticalLocked = false;
+
+ui.on_message('machine_resolved', () => {
+  criticalLocked = false;
+  updateFeedback(null);
+});
+
 // ... (existing code between)
 
 // Start the application
@@ -313,19 +322,40 @@ function updateFeedback(anomalyScore = null) {
 
   if (anomalyScore !== null) {
     const isCritical = anomalyScore >= 5;
+
+    if (isCritical) {
+      criticalLocked = true; // hold CRITICAL until machine_resolved arrives
+    }
+
     feedbackContentWrapper.innerHTML = `
       <div class="status-badge ${isCritical ? 'status-critical' : 'status-warning'}">
         <span class="status-icon">${isCritical ? '🔴' : '⚠️'}</span>
         <div class="status-details">
           <span class="status-label">${isCritical ? 'CRITICAL' : 'ANOMALY DETECTED'}</span>
-          <span class="status-sub">Score: ${anomalyScore.toFixed(2)}${isCritical ? ' — Immediate attention required' : ''}</span>
+          <span class="status-sub">Score: ${anomalyScore.toFixed(2)}${isCritical ? ' — Machine stopped. Awaiting resolve.' : ''}</span>
         </div>
       </div>`;
+
     // Update last anomaly stat
     const now = new Date();
     document.getElementById('stat-last-anomaly').textContent =
       now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    feedbackTimeout = setTimeout(() => updateFeedback(null), 4000);
+
+    // Non-critical anomalies auto-reset after 4 s; critical stays locked
+    if (!isCritical) {
+      feedbackTimeout = setTimeout(() => updateFeedback(null), 4000);
+    }
+
+  } else if (criticalLocked) {
+    // Keep showing CRITICAL — machine_resolved hasn't arrived yet
+    feedbackContentWrapper.innerHTML = `
+      <div class="status-badge status-critical">
+        <span class="status-icon">🔴</span>
+        <div class="status-details">
+          <span class="status-label">CRITICAL</span>
+          <span class="status-sub">Machine stopped. Awaiting resolve.</span>
+        </div>
+      </div>`;
   } else {
     feedbackContentWrapper.innerHTML = `
       <div class="status-badge status-nominal">

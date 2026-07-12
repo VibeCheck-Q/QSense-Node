@@ -53,7 +53,8 @@ def _on_message(client, userdata, msg):
         return
 
     if payload.get("resolved") == 1:
-        logger.info(f"Alert {ALERT_ID} acknowledged — stopping LED animation")
+        logger.info(f"Alert {ALERT_ID} acknowledged — stopping LED animation, restarting machine")
+        ui.send_message('machine_resolved', {})
         try:
             Bridge.call("stop_alert_animation")
         except Exception as exc:
