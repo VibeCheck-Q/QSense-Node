@@ -56,18 +56,35 @@ int  frameIndex  = 0;
 unsigned long previousMillisAnim = 0;
 const long    intervalAnim       = 500; // 2 Hz blink (500 ms per frame)
 
+// --- Motor Control ---
+#define MOTOR_PIN_A 9
+#define MOTOR_PIN_B 10
+
+void motorOn() {
+  digitalWrite(MOTOR_PIN_A, HIGH);
+  digitalWrite(MOTOR_PIN_B, LOW);
+}
+
+void motorOff() {
+  digitalWrite(MOTOR_PIN_A, LOW);
+  digitalWrite(MOTOR_PIN_B, LOW);
+}
+
 // Called by Python when a critical anomaly is first detected.
+// Starts LED alert and shuts down the motor.
 void startAlertAnimation() {
   alertActive = true;
   frameIndex  = 0;
-  // backdate the timer so the first frame draws immediately on the next loop tick
-  previousMillisAnim = millis() - intervalAnim;
+  previousMillisAnim = millis() - intervalAnim; // first frame draws immediately
+  motorOff();
 }
 
 // Called by Python when qsense/machine/ack receives resolved=1.
+// Clears LED alert and restarts the motor.
 void stopAlertAnimation() {
   alertActive = false;
-  matrix.draw(blankFrame); // turn off all LEDs
+  matrix.draw(blankFrame);
+  motorOn();
 }
 
 // Called by Python via Bridge.call() when a critical anomaly is detected.
@@ -89,6 +106,11 @@ void setup() {
   }
   thermo.begin();
   buzzer.begin();
+
+  // Motor pins — default ON (motor runs during normal operation)
+  pinMode(MOTOR_PIN_A, OUTPUT);
+  pinMode(MOTOR_PIN_B, OUTPUT);
+  motorOn();
 
   Bridge.provide("trigger_alert_buzzer",  triggerAlertBuzzer);
   Bridge.provide("start_alert_animation", startAlertAnimation);
