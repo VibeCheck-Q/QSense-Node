@@ -104,14 +104,41 @@ PART_NAME   = "Fan Motor"
 PART_NO     = "PN-001"
 ```
 
+### Machine Control (Emergency Stop)
+
+On a critical anomaly the machine is **automatically stopped** via two GPIO pins wired to the machine's motor driver. It restarts only when the alert is acknowledged.
+
+| Pin | Role |
+|---|---|
+| `D9` (`MACHINE_PIN_A`) | Direction / enable A |
+| `D10` (`MACHINE_PIN_B`) | Direction / enable B |
+
+```cpp
+// Machine running (normal operation)
+digitalWrite(9, HIGH);
+digitalWrite(10, LOW);
+
+// Machine stopped (critical anomaly)
+digitalWrite(9, LOW);
+digitalWrite(10, LOW);
+```
+
+Configure the pins at the top of `sketch/sketch.ino`:
+
+```cpp
+#define MACHINE_PIN_A 9
+#define MACHINE_PIN_B 10
+```
+
 ### Alarm Severity Levels
 
-| Score | Status | Dashboard | Buzzer |
-|---|---|---|---|
-| — | ⏳ INITIALIZING | Grey | Silent |
-| Any | 🟢 NOMINAL | Sage green | Silent |
-| < 5.0 | ⚠️ ANOMALY DETECTED | Amber | Silent |
-| ≥ 5.0 | 🔴 CRITICAL | Coral red | 3-second 1 kHz tone |
+| Score | Status | Dashboard | Buzzer | LED Matrix | Machine |
+|---|---|---|---|---|---|
+| — | ⏳ INITIALIZING | Grey | Silent | Off | Running |
+| Any | 🟢 NOMINAL | Sage green | Silent | Off | Running |
+| < 5.0 | ⚠️ ANOMALY DETECTED | Amber | Silent | Off | Running |
+| ≥ 5.0 | 🔴 CRITICAL | Coral red | 3-sec 1 kHz tone | Blinking | **Stopped** |
+| `resolved=1` received | 🟢 NOMINAL | Sage green | Silent | Off | **Restarted** |
 
 ---
 
@@ -123,10 +150,11 @@ PART_NO     = "PN-001"
 | Modulino Movement (LSM6DSOX IMU) | Vibration / accelerometer | 1 |
 | Modulino Thermo (HS300x) | Temperature + Humidity | 1 |
 | Modulino Buzzer | Critical alarm output | 1 |
+| Motor driver (e.g. L298N) | Machine emergency stop | 1 |
 | Qwiic Cables | Sensor interconnect | 3 |
 | USB-C to USB-A Cable | Power + serial | 1 |
 
-Mount the Movement module magnetically onto the motor casing — no invasive modification required. The Thermo module can be placed nearby to monitor ambient conditions around the machine.
+Mount the Movement module magnetically onto the machine casing — no invasive modification required. The Thermo module can be placed nearby to monitor ambient conditions. The motor driver IN1/IN2 connects to pins D9/D10 on the UNO Q.
 
 ---
 
