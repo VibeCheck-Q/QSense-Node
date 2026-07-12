@@ -241,17 +241,78 @@ Configure the pins at the top of `sketch/sketch.ino`:
 
 ## Hardware Requirements
 
-| Component | Purpose | Quantity |
-|---|---|---|
-| Arduino UNO Q (or Arduino VENTUNO Q) | Main compute board | 1 |
-| Modulino Movement (LSM6DSOX IMU) | Vibration / accelerometer | 1 |
-| Modulino Thermo (HS300x) | Temperature + Humidity | 1 |
-| Modulino Buzzer | Critical alarm output | 1 |
-| Motor driver (e.g. L298N) | Machine emergency stop | 1 |
-| Qwiic Cables | Sensor interconnect | 3 |
-| USB-C to USB-A Cable | Power + serial | 1 |
+### Components List
 
-Mount the Movement module magnetically onto the machine casing — no invasive modification required. The Thermo module can be placed nearby to monitor ambient conditions. The motor driver IN1/IN2 connects to pins D9/D10 on the UNO Q.
+| # | Component | Model / Spec | Role | Qty |
+|---|---|---|---|---|
+| 1 | **Arduino UNO Q** | Qualcomm QRB2210 | Main compute board — runs firmware, Python backend, and WebUI | 1 |
+| 2 | **Modulino Movement** | LSM6DSOX IMU | Captures X/Y/Z vibration at 62.5 Hz via Qwiic | 1 |
+| 3 | **Modulino Thermo** | HS300x | Reads ambient temperature + humidity at 1 Hz via Qwiic | 1 |
+| 4 | **Modulino Buzzer** | — | Plays 3-second 1 kHz alarm tone on critical anomaly via Qwiic | 1 |
+| 5 | **Motor Driver** | L298N (or equivalent) | Controls the demo motor (simulates machine on/off) | 1 |
+| 6 | **DC Motor** | 5–12 V DC | Simulates the monitored machine; stopped on critical anomaly | 1 |
+| 7 | **Qwiic Cables** | SparkFun / Arduino Qwiic | Daisy-chain Modulino sensors to the board | 3 |
+| 8 | **Jumper Wires** | Male–Male | Connect motor driver to UNO Q GPIO and motor terminals | 6+ |
+| 9 | **USB-C to USB-A Cable** | — | Power + serial flash | 1 |
+| 10 | **External Power Supply** | 5–12 V, ≥ 1 A | Powers motor driver and motor (separate from board power) | 1 |
+
+---
+
+### Wiring Diagram
+
+#### Modulino Sensors → Arduino UNO Q (Qwiic / I2C)
+
+All three Modulino modules connect via the **Qwiic daisy-chain** on the `Wire1` I2C bus. No individual pin wiring is needed — just plug cables in sequence:
+
+```
+Arduino UNO Q
+  [Qwiic port] ──── Modulino Movement (LSM6DSOX)
+                         │
+                    [Qwiic out] ──── Modulino Thermo (HS300x)
+                                          │
+                                     [Qwiic out] ──── Modulino Buzzer
+```
+
+> The Qwiic connector carries VCC (3.3 V), GND, SDA, and SCL. No soldering required.
+
+---
+
+#### Motor Driver (L298N) → Arduino UNO Q (GPIO)
+
+The motor driver acts as the machine emergency stop. The UNO Q controls it via two digital GPIO pins.
+
+```
+Arduino UNO Q                L298N Motor Driver          DC Motor
+─────────────                ──────────────────          ────────
+  D9  (MACHINE_PIN_A) ──────► IN1                        
+  D10 (MACHINE_PIN_B) ──────► IN2                        
+  GND ─────────────── ──────► GND                        
+                               OUT1 ──────────────────── Motor +
+                               OUT2 ──────────────────── Motor −
+                               12V  ◄── External PSU +
+                               GND  ◄── External PSU −
+                               ENA  ──── 5V (always enabled)
+```
+
+| UNO Q Pin | L298N Pin | State: Machine ON | State: Machine OFF |
+|---|---|---|---|
+| `D9` | `IN1` | HIGH | LOW |
+| `D10` | `IN2` | LOW | LOW |
+| `GND` | `GND` | — | — |
+
+> **Important:** Power the L298N from an external supply (5–12 V), not from the UNO Q's 5 V pin. Connect GND of the external supply to GND on the UNO Q to share a common ground.
+
+---
+
+### Tools & Software Required
+
+| Tool | Purpose |
+|---|---|
+| **Arduino App Lab** | Deploy and manage apps on the UNO Q |
+| **Arduino App CLI** (`arduino-app-cli`) | Start, stop, restart, and view logs from the terminal |
+| **Edge Impulse Studio** | Trained the vibration anomaly detection model (public project linked above) |
+| **MQTT client** (`mosquitto_pub` / `mosquitto_sub` / MQTTX) | Test alert and ack messages on the broker |
+| **Web browser** | Open the live dashboard at `http://<board-ip>:7000` |
 
 ---
 
