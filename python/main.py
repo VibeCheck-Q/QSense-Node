@@ -122,13 +122,6 @@ def on_detected_anomaly(anomaly_score: float, classification: dict):
     if anomaly_score >= CRITICAL_SCORE_THRESHOLD:
         # Publish unresolved ack so downstream subscribers know alert is active
         _mqtt_publish(MQTT_ACK_TOPIC, {"alertId": ALERT_ID, "resolved": 0})
-    else:
-        # Non-critical anomaly — notify on dedicated topic
-        _mqtt_publish(MQTT_ANOMALY_TOPIC, {
-            "alertId":  ALERT_ID,
-            "severity": round(anomaly_score, 4),
-            "resolved": 0,
-        })
 
         # Start LED alert animation — stays on until resolved=1 arrives on ack topic
         try:
@@ -142,6 +135,13 @@ def on_detected_anomaly(anomaly_score: float, classification: dict):
             logger.info(f"Critical alert [{ALERT_ID}] — buzzer + LED animation started (score: {anomaly_score:.2f})")
         except Exception as exc:
             logger.warning(f"trigger_alert_buzzer failed: {exc}")
+    else:
+        # Non-critical anomaly — notify on dedicated topic, no buzzer or LED
+        _mqtt_publish(MQTT_ANOMALY_TOPIC, {
+            "alertId":  ALERT_ID,
+            "severity": round(anomaly_score, 4),
+            "resolved": 0,
+        })
 
 
 vibration_detection.on_anomaly(on_detected_anomaly)
