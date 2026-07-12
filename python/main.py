@@ -14,8 +14,9 @@ logger = Logger("vibration-detector")
 # --- MQTT Configuration ---
 MQTT_BROKER    = "test.mosquitto.org"
 MQTT_PORT      = 1883
-MQTT_TOPIC     = "qsense/machine/monitoring"  # outbound: anomaly alerts
-MQTT_ACK_TOPIC = "qsense/machine/ack"         # bidirectional: resolved=0 / resolved=1
+MQTT_TOPIC         = "qsense/machine/monitoring"  # outbound: full anomaly alerts
+MQTT_ANOMALY_TOPIC = "qsense/machine/anomaly"    # outbound: non-critical anomaly notify
+MQTT_ACK_TOPIC     = "qsense/machine/ack"        # bidirectional: critical resolved=0/1
 
 # --- Machine / Part Info ---
 MACHINE_NO = "M-01"
@@ -121,6 +122,13 @@ def on_detected_anomaly(anomaly_score: float, classification: dict):
     if anomaly_score >= CRITICAL_SCORE_THRESHOLD:
         # Publish unresolved ack so downstream subscribers know alert is active
         _mqtt_publish(MQTT_ACK_TOPIC, {"alertId": ALERT_ID, "resolved": 0})
+    else:
+        # Non-critical anomaly — notify on dedicated topic
+        _mqtt_publish(MQTT_ANOMALY_TOPIC, {
+            "alertId":  ALERT_ID,
+            "severity": round(anomaly_score, 4),
+            "resolved": 0,
+        })
 
         # Start LED alert animation — stays on until resolved=1 arrives on ack topic
         try:
