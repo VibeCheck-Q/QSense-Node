@@ -14,14 +14,14 @@ import db
 logger = Logger("vibration-detector")
 
 # --- MQTT Configuration ---
-MQTT_BROKER        = "test.mosquitto.org"
+MQTT_BROKER        = "192.168.8.153" # Local MQTT broker
 MQTT_PORT          = 1883
 MQTT_TOPIC         = "qsense/machine/monitoring"  # outbound: full anomaly alerts
 MQTT_ANOMALY_TOPIC = "qsense/machine/anomaly"     # outbound: non-critical anomaly notify
 MQTT_ACK_TOPIC     = "qsense/machine/ack"         # bidirectional: critical resolved=0/1
 MQTT_HEALTH_TOPIC  = "qsense/machine/health"      # outbound: periodic heartbeat
 
-HEALTH_INTERVAL_S  = 30                           # seconds between heartbeat publishes
+HEALTH_INTERVAL_S  = 10                          # seconds between heartbeat publishes
 
 # --- Machine / Part Info ---
 MACHINE_NO = "M-01"

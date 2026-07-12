@@ -57,8 +57,8 @@ unsigned long previousMillisAnim = 0;
 const long    intervalAnim       = 500; // 2 Hz blink (500 ms per frame)
 
 // --- Machine Control ---
-#define MACHINE_PIN_A 9 // 12v +ve PIN - Motor Driver IN1
-#define MACHINE_PIN_B 8 // 12v -ve PIN - Motor Driver IN2
+#define MACHINE_PIN_A 9 // 12v +ve PIN - Machine Driver IN1
+#define MACHINE_PIN_B 8 // 12v -ve PIN - Machine Driver IN2
 
 void machineOn() {
   digitalWrite(MACHINE_PIN_A, HIGH); 

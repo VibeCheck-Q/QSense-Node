@@ -5,6 +5,10 @@
 
 ![Dashboard Screenshot](assets/docs_assets/dashboard-preview.png)
 
+#### Hardware Node 
+
+![Hardare Connection](./assets/docs_assets/hardware-node-image.png)
+
 ---
 
 ## What is QSense Factory?
@@ -259,6 +263,8 @@ Configure the pins at the top of `sketch/sketch.ino`:
 ---
 
 ### Wiring Diagram
+
+![Hardare Connection](./assets/docs_assets/hardware-node-image.png)
 
 #### Modulino Sensors → Arduino UNO Q (Qwiic / I2C)
 
