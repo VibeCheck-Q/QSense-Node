@@ -361,46 +361,182 @@ The app ID is `user:qsense-machine-monitoring`.
 
 ---
 
-## How to Run
+## Getting Started Guide
 
-1. **Connect hardware**  
-   Plug the Modulino Movement and Modulino Thermo into the Arduino UNO Q via the Qwiic connector. Attach the Modulino Buzzer for critical alarm output.
+Follow these steps in order. The whole setup takes about 5 minutes.
 
-2. **Start the app via CLI**  
-   ```bash
-   arduino-app-cli app start user:qsense-machine-monitoring
-   ```
+---
 
-3. **Open the dashboard**  
-   Navigate to `http://<UNO-Q-IP-ADDRESS>:7000` from any browser on the same network.
+### Step 1 — Wire the Hardware
 
-4. **Monitor**  
-   The **Machine Faults** chart shows live X/Y/Z vibration waveforms. The **Environment** row shows live Temperature and Humidity from the Thermo module.
+**Modulino sensors (Qwiic chain):**
 
-5. **Tune sensitivity**  
-   Use the **Anomaly Threshold** slider.  
-   - Lower → more sensitive (small deviations trigger alerts)  
-   - Higher → less sensitive (only strong deviations trigger alerts)  
-   - The value is a raw anomaly score, not a 0–1 confidence.  
-   - Use the numeric input for scores above the slider range (>20).
+Connect the three Modulino modules in a daisy-chain using Qwiic cables:
 
-6. **Trigger a test anomaly**  
-   Shake the sensor by hand. The **Machine Status** panel will switch to ⚠️ ANOMALY DETECTED and log it in **Recent Anomalies** with a score and timestamp. If the score exceeds **5.0** (Critical):
-   - Status locks to 🔴 **CRITICAL — Machine stopped. Awaiting resolve.**
-   - Buzzer fires a 3-second alarm tone
-   - LED matrix starts blinking
-   - Machine output (pins D9/D10) is cut
+```
+UNO Q Qwiic port → Movement → Thermo → Buzzer
+```
 
-7. **Resolve a critical alert**  
-   Once the repair is done, publish the resolve command from any MQTT client on the network:
-   ```bash
-   mosquitto_pub -h "test.mosquitto.org" -t "qsense/machine/ack" \
-     -m '{"alertId": "M-01", "resolved": 1}'
-   ```
-   This will:
-   - Return the dashboard to 🟢 **NOMINAL — All systems operating normally**
-   - Turn off the LED matrix
-   - Restart the machine (pins D9/D10)
+No individual pin wiring is needed — all sensors are plug-and-play via Qwiic.
+
+**Motor driver (L298N) for machine demo:**
+
+| Wire | From (UNO Q) | To (L298N) |
+|---|---|---|
+| Signal A | `D9` | `IN1` |
+| Signal B | `D10` | `IN2` |
+| Ground | `GND` | `GND` |
+| Motor + | — | `OUT1` → Motor |
+| Motor − | — | `OUT2` → Motor |
+| Power | External 5–12 V PSU | `12V` + `GND` |
+| Enable | — | `ENA` → 5V (jumper) |
+
+> Tip: Mount the Modulino Movement magnetically on the motor body — it picks up real machine vibration this way.
+
+---
+
+### Step 2 — Clone the Repository
+
+```bash
+git clone git@github.com:VibeCheck-Q/QSense-Node.git
+cd QSense-Node
+```
+
+---
+
+### Step 3 — Configure Machine Identity
+
+Open `python/main.py` and update the constants at the top to match your machine:
+
+```python
+MQTT_BROKER = "test.mosquitto.org"  # change to your broker if needed
+MACHINE_NO  = "M-01"
+PART_NAME   = "Fan-Motor"
+PART_NO     = "PN-001"
+ALERT_ID    = "M-01"               # must be unique per machine
+```
+
+---
+
+### Step 4 — Start the App
+
+Connect the Arduino UNO Q via USB, then run:
+
+```bash
+arduino-app-cli app start user:qsense-machine-monitoring
+```
+
+The CLI will:
+1. Compile and flash `sketch.ino` to the board
+2. Start the Python backend in a Docker container
+3. Serve the web dashboard on port `7000`
+
+Watch the logs to confirm startup:
+
+```bash
+arduino-app-cli app logs user:qsense-machine-monitoring
+```
+
+You should see lines like:
+```
+SQLite cache initialised
+MQTT connected — subscribed to 'qsense/machine/ack'
+```
+
+---
+
+### Step 5 — Open the Dashboard
+
+Navigate to the board's IP address in any browser on the same network:
+
+```
+http://<UNO-Q-IP-ADDRESS>:7000
+```
+
+The dashboard will show:
+- ⏳ **INITIALIZING** for ~3.5 seconds, then switches to 🟢 **NOMINAL**
+- Live X/Y/Z waveform in the **Machine Faults** chart
+- Live Temperature and Humidity sparklines
+- Machine ID, run-time, and date/time in the stats bar
+
+---
+
+### Step 6 — Monitor MQTT Topics (Optional)
+
+Subscribe to watch all events in real time:
+
+```bash
+# Full anomaly alerts
+mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/monitoring"
+
+# Non-critical anomaly notify
+mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/anomaly"
+
+# Critical alert ack channel
+mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/ack"
+
+# Health heartbeat (every 30 s)
+mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/health"
+```
+
+---
+
+### Step 7 — Tune Sensitivity
+
+Use the **Anomaly Threshold** slider on the dashboard:
+
+| Slider direction | Effect |
+|---|---|
+| Lower value | More sensitive — small vibration changes trigger alerts |
+| Higher value | Less sensitive — only large deviations trigger alerts |
+
+The threshold is a raw K-means distance score, not a 0–1 confidence value. Use the numeric input field for scores above 20.
+
+---
+
+### Step 8 — Trigger a Test Anomaly
+
+Shake the Modulino Movement by hand or tap the motor casing.
+
+**If score < 5.0:**
+- Dashboard shows ⚠️ **ANOMALY DETECTED** (auto-clears after 4 s)
+- Event logged in **Recent Anomalies** list
+- MQTT published to `qsense/machine/anomaly`
+
+**If score ≥ 5.0 (Critical):**
+- Dashboard locks to 🔴 **CRITICAL — Machine stopped. Awaiting resolve.**
+- Buzzer fires a 3-second 1 kHz alarm
+- LED matrix starts blinking
+- Motor driver cuts power (D9 LOW, D10 LOW)
+- MQTT published to `qsense/machine/ack` with `resolved: 0`
+
+---
+
+### Step 9 — Resolve a Critical Alert
+
+Once the issue is inspected and repaired, send the resolve command from any MQTT client:
+
+```bash
+mosquitto_pub -h "test.mosquitto.org" -t "qsense/machine/ack" \
+  -m '{"alertId": "M-01", "resolved": 1}'
+```
+
+This will immediately:
+- Return the dashboard to 🟢 **NOMINAL**
+- Turn off the LED matrix
+- Restart the motor (D9 HIGH, D10 LOW)
+
+---
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Dashboard shows blank anomaly list after refresh | Normal on first run — anomalies populate after the first detection event |
+| MQTT messages not arriving | Check broker address in `main.py`; confirm network connectivity |
+| Board not detected by CLI | Check USB connection; run `arduino-app-cli app list` to confirm board state |
+| Buzzer fires on every anomaly | Anomaly score is crossing 5.0; raise the threshold slider |
+| Motor not stopping | Check D9/D10 wiring to L298N IN1/IN2; confirm external PSU is connected |
 
 ---
 
