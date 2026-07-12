@@ -197,7 +197,7 @@ Every anomaly (regardless of severity) publishes to `machine/anomaly`:
 Configure broker, topic, and machine details at the top of `python/main.py`:
 
 ```python
-MQTT_BROKER = "localhost"
+MQTT_BROKER = "MQTT Broker ID" #Here our Qsense AI PC Web ID
 MQTT_PORT   = 1883
 MQTT_TOPIC  = "machine/anomaly"
 MACHINE_NO  = "M-01"
@@ -272,11 +272,11 @@ All three Modulino modules connect via the **Qwiic daisy-chain** on the `Wire1` 
 
 ```
 Arduino UNO Q
-  [Qwiic port] ──── Modulino Movement (LSM6DSOX)
+  [Qwiic port] ──── Modulino Buzzer
                          │
-                    [Qwiic out] ──── Modulino Thermo (HS300x)
+                    [Qwiic out] ──── Modulino Movement (LSM6DSOX)
                                           │
-                                     [Qwiic out] ──── Modulino Buzzer
+                                     [Qwiic out] ──── Modulino Thermo (HS300x)
 ```
 
 > The Qwiic connector carries VCC (3.3 V), GND, SDA, and SCL. No soldering required.
@@ -473,16 +473,16 @@ Subscribe to watch all events in real time:
 
 ```bash
 # Full anomaly alerts
-mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/monitoring"
+mosquitto_sub -h "{AI PC IP}" -t "qsense/machine/monitoring"
 
 # Non-critical anomaly notify
-mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/anomaly"
+mosquitto_sub -h "{AI PC IP}" -t "qsense/machine/anomaly"
 
 # Critical alert ack channel
-mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/ack"
+mosquitto_sub -h "{AI PC IP}" -t "qsense/machine/ack"
 
 # Health heartbeat (every 30 s)
-mosquitto_sub -h "test.mosquitto.org" -t "qsense/machine/health"
+mosquitto_sub -h "{AI PC IP}" -t "qsense/machine/health"
 ```
 
 ---
@@ -523,7 +523,7 @@ Shake the Modulino Movement by hand or tap the motor casing.
 Once the issue is inspected and repaired, send the resolve command from any MQTT client:
 
 ```bash
-mosquitto_pub -h "test.mosquitto.org" -t "qsense/machine/ack" \
+mosquitto_pub -h "{AI PC IP}" -t "qsense/machine/ack" \
   -m '{"alertId": "M-01", "resolved": 1}'
 ```
 
