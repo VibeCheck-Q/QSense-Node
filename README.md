@@ -132,13 +132,13 @@ Configure the pins at the top of `sketch/sketch.ino`:
 
 ### Alarm Severity Levels
 
-| Score | Status | Dashboard | Buzzer | LED Matrix | Machine |
-|---|---|---|---|---|---|
-| — | ⏳ INITIALIZING | Grey | Silent | Off | Running |
-| Any | 🟢 NOMINAL | Sage green | Silent | Off | Running |
-| < 5.0 | ⚠️ ANOMALY DETECTED | Amber | Silent | Off | Running |
-| ≥ 5.0 | 🔴 CRITICAL | Coral red | 3-sec 1 kHz tone | Blinking | **Stopped** |
-| `resolved=1` received | 🟢 NOMINAL | Sage green | Silent | Off | **Restarted** |
+| Score | Status | Dashboard | Buzzer | LED Matrix | Machine | Recent Anomalies |
+|---|---|---|---|---|---|---|
+| — | ⏳ INITIALIZING | Grey | Silent | Off | Running | — |
+| Any | 🟢 NOMINAL | Sage green | Silent | Off | Running | — |
+| < 5.0 | ⚠️ ANOMALY DETECTED | Amber | Silent | Off | Running | `Anomaly` — normal style |
+| ≥ 5.0 | 🔴 CRITICAL | Coral red | 3-sec 1 kHz tone | Blinking | **Stopped** | `🔴 CRITICAL` — bold red, red border |
+| `resolved=1` received | 🟢 NOMINAL | Sage green | Silent | Off | **Restarted** | — |
 
 ---
 
@@ -324,7 +324,7 @@ Built with the **QSense Factory design system (v2 — light/minimal)**:
 | **Machine Faults** | Full-width live X/Y/Z waveform (HTML5 Canvas, 200 pts rolling) |
 | **Machine Status** | Industrial badge — 🟢 NOMINAL / ⚠️ ANOMALY / 🔴 CRITICAL (locked until resolved=1) |
 | **Anomaly Threshold** | Pill slider (0–20+) with live numeric input and reset |
-| **Recent Anomalies** | Last 5 events — score, label, timestamp (scrollable) |
+| **Recent Anomalies** | Last 5 events — score, label, timestamp (scrollable); critical entries shown in bold red with 🔴 CRITICAL label |
 | **Temperature** | Live big-number display + Chart.js sparkline |
 | **Humidity** | Live big-number display + Chart.js sparkline |
 
