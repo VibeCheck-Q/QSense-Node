@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 import json
+import threading
 from datetime import datetime
 import paho.mqtt.client as mqtt
 from arduino.app_utils import *
@@ -18,6 +19,9 @@ MQTT_PORT          = 1883
 MQTT_TOPIC         = "qsense/machine/monitoring"  # outbound: full anomaly alerts
 MQTT_ANOMALY_TOPIC = "qsense/machine/anomaly"     # outbound: non-critical anomaly notify
 MQTT_ACK_TOPIC     = "qsense/machine/ack"         # bidirectional: critical resolved=0/1
+MQTT_HEALTH_TOPIC  = "qsense/machine/health"      # outbound: periodic heartbeat
+
+HEALTH_INTERVAL_S  = 30                           # seconds between heartbeat publishes
 
 # --- Machine / Part Info ---
 MACHINE_NO = "M-01"
@@ -205,5 +209,27 @@ def record_sensor_samples(celsius: float, humidity: float):
 
 
 Bridge.provide("record_sensor_samples", record_sensor_samples)
+
+
+# ---------------------------------------------------------------------------
+# Health heartbeat — publishes to qsense/machine/health every HEALTH_INTERVAL_S
+# ---------------------------------------------------------------------------
+
+_app_start_time = datetime.now()
+
+def _publish_health():
+    uptime_s = int((datetime.now() - _app_start_time).total_seconds())
+    _mqtt_publish(MQTT_HEALTH_TOPIC, {
+        "alertId":   ALERT_ID,
+        "machineNo": MACHINE_NO,
+        "status":    "online",
+        "uptime_s":  uptime_s,
+        "timestamp": datetime.now().isoformat(),
+    })
+    # Reschedule
+    threading.Timer(HEALTH_INTERVAL_S, _publish_health).start()
+
+# Send first heartbeat immediately, then every HEALTH_INTERVAL_S seconds
+threading.Timer(0, _publish_health).start()
 
 App.run()
