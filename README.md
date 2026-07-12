@@ -41,42 +41,139 @@ This repository contains the **Arduino UNO Q node** — the Detect stage. It ret
 - Accepts dynamic **threshold adjustments** from the dashboard without restarting
 - Exposes a **reset endpoint** so the Copilot+ PC can reset the baseline once a repair is confirmed
 
-### App Flow
+### Minimum Workflow
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                          Arduino UNO Q                               │
-│                                                                      │
-│  ┌─ Modulino Movement ─┐   62.5 Hz    ┌─────────────────────────┐   │
-│  │  X / Y / Z accel    │──Bridge.notify─►  record_sensor_movement │   │
-│  └─────────────────────┘              │  • g → m/s² conversion   │   │
-│                                       │  • WebUI: live plot       │   │
-│  ┌─ Modulino Thermo ───┐    1 Hz      │  • VibrationAnomalyDetect │   │
-│  │  Temperature        │──Bridge.notify─►  record_sensor_samples  │   │
-│  │  Humidity           │              │  • WebUI: temp / humidity │   │
-│  └─────────────────────┘              └────────────┬────────────┘   │
-│                                                    │                 │
-│                                         on_detected_anomaly()        │
-│                                                    │                 │
-│                              ┌─────────────────────┼──────────────┐ │
-│                              │  score < 5.0         │  score ≥ 5.0 │ │
-│                              ▼                      ▼              │ │
-│                         ⚠️ ANOMALY            🔴 CRITICAL          │ │
-│                         WebUI badge           WebUI badge          │ │
-│                         MQTT publish          MQTT publish         │ │
-│                                               Bridge.call ──────► │ │
-│                                               Modulino Buzzer      │ │
-│                                               3-sec alarm tone     │ │
-│                              └──────────────────────────────────┘  │ │
-└──────────────────────────────────────────────────────────────────────┘
-                    │ MQTT
-                    ▼
-           broker (machine/anomaly)
-           {alertId, machineNo, partName, partNo, severity, timestamp}
-                    │
-                    ▼
-           Copilot+ PC / any MQTT subscriber
+  ┌──────────────┐  vibration   ┌────────────────────┐  score + alert  ┌──────────────┐
+  │   Modulino   │─────────────►│    Arduino UNO Q   │────────────────►│  Dashboard   │
+  │   Movement   │              │                    │                 │  (browser)   │
+  └──────────────┘              │  Edge Impulse AI   │  MQTT publish   ├──────────────┤
+  ┌──────────────┐  temp / hum  │  model on-device   │────────────────►│ MQTT Broker  │
+  │   Modulino   │─────────────►│                    │                 │              │
+  │   Thermo     │              └────────────────────┘  resolved=1    ├──────────────┤
+  └──────────────┘                       ▲              ◄─────────────│  Technician  │
+                                         │                             └──────────────┘
+                                  Buzzer / LED /
+                                  Machine stop
 ```
+
+### Detailed App Flow
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                              Arduino UNO Q                                       │
+│                                                                                  │
+│  ┌─ Modulino Movement ─┐  62.5 Hz                                                │
+│  │  X / Y / Z accel    │──Bridge.notify──► record_sensor_movement()              │
+│  └─────────────────────┘                   │  g → m/s²  │  WebUI: live plot      │
+│                                            │            ▼                        │
+│  ┌─ Modulino Thermo ───┐   1 Hz            │   VibrationAnomalyDetection brick   │
+│  │  Temperature        │──Bridge.notify──► record_sensor_samples()               │
+│  │  Humidity           │                   │  WebUI: temp/humidity               │
+│  └─────────────────────┘                   │  SQLite: environment table          │
+│                                            ▼                                    │
+│                                  on_detected_anomaly()                           │
+│                                   │  SQLite: anomalies table                    │
+│                                   │  MQTT → qsense/machine/monitoring            │
+│                    ───────────────┴───────────────────                          │
+│                    │ score < 5.0              │ score ≥ 5.0                      │
+│                    ▼                          ▼                                  │
+│              ⚠️ ANOMALY                  🔴 CRITICAL                             │
+│              WebUI badge                 WebUI badge (LOCKED)                   │
+│              MQTT →                      MQTT → qsense/machine/ack              │
+│              qsense/machine/anomaly      Bridge.call → Modulino Buzzer           │
+│                                          Bridge.call → LED Matrix (blink)        │
+│                                          Bridge.call → Machine OFF (D9/D10)      │
+│                    ───────────────────────────────────────────                  │
+│                                                                                  │
+│  Every 30 s ──► health heartbeat ──► MQTT → qsense/machine/health               │
+│                  {status, uptime_s, timestamp}                                   │
+│                                                                                  │
+│  On page load ──► SQLite history ──► WebUI: anomalies + env + run-time          │
+└──────────────────────────────────────────────────────────────────────────────────┘
+                        │
+          ┌─────────────┼───────────────────┐
+          ▼             ▼                   ▼
+  qsense/machine/  qsense/machine/   qsense/machine/
+    monitoring       anomaly            health
+  (full alert)    (non-critical)     (heartbeat)
+          │
+          ▼ (on resolved=1)
+  qsense/machine/ack ──► LED off · Machine ON · Dashboard → 🟢 NOMINAL
+```
+
+---
+
+## AI Model — Vibration Anomaly Detection
+
+> Public Edge Impulse project: [QSense — Machine Monitoring EI](https://studio.edgeimpulse.com/public/1056545/live)
+
+### Data Collection
+
+Vibration data was captured using the **Modulino Movement** (LSM6DSOX IMU) mounted on the target machine, streaming **accX, accY, accZ at 100 Hz**. Two labels were collected:
+
+| Label | Description |
+|---|---|
+| `nominal` | Machine running under normal operating conditions |
+| `off` | Machine powered off / idle |
+
+Total dataset: **182 samples · 9m 6s** of labelled vibration data.
+
+### Impulse Design
+
+```
+Raw accX/Y/Z (100 Hz)
+        │
+        ▼
+┌─────────────────────┐
+│  Spectral Analysis  │  DSP block — extracts frequency-domain features
+│  (DSP block)        │  from the time-series accelerometer data
+└─────────────────────┘
+        │
+        ├──────────────────────────────────────┐
+        ▼                                      ▼
+┌──────────────────┐                 ┌───────────────────┐
+│  NN Classifier   │                 │  Anomaly Detection│
+│  (Keras)         │                 │  (K-means)        │
+│                  │                 │                   │
+│  Input layer     │                 │  Learns the       │
+│  Dense layer     │                 │  cluster centroid │
+│  Dense layer     │                 │  of nominal data  │
+│  Output layer    │                 │                   │
+│  (softmax)       │                 │  Score = distance │
+└──────────────────┘                 │  from centroid    │
+        │                            └───────────────────┘
+        ▼                                      │
+  nominal / off                                ▼
+  classification                       anomaly score
+                                       (used as threshold)
+```
+
+### Model Performance
+
+| Metric | Value |
+|---|---|
+| **F1 Score (validation)** | **100%** |
+| **F1 Score (test set)** | 76.2% |
+| **Inferencing time** | **1 ms** |
+| **Peak RAM usage** | **1.7 KB** |
+| **Flash usage** | **20.0 KB** |
+| **Target board** | Arduino UNO Q (Qualcomm QRB2210) |
+
+The model runs entirely **on-device** with sub-millisecond inference and a minimal memory footprint — leaving ample resources for the Bridge, WebUI, and sensor loops running simultaneously.
+
+### Deployment
+
+The trained model was exported from Edge Impulse and deployed to the Arduino UNO Q via **Arduino App Lab** as the `vibration_anomaly_detection` brick. The app uses two Arduino App bricks:
+
+| Brick | Purpose |
+|---|---|
+| `vibration_anomaly_detection` | Runs the Edge Impulse model; emits `on_anomaly` callbacks with score |
+| `web_ui` | Serves the real-time dashboard; handles WebSocket messages between Python and browser |
+
+The device-specific dashboard (`assets/index.html`) displays machine identity (ID, placement, run-time), live X/Y/Z waveforms, environment readings, alarm status, and the anomaly history — all running locally on the board with no cloud dependency.
+
+---
 
 ### MQTT Alert Payload
 
@@ -174,7 +271,8 @@ qsense-node/
 │   ├── sketch.ino        # Arduino firmware — IMU read loop, Bridge.notify
 │   └── sketch.yaml       # Board & library config
 ├── python/
-│   └── main.py           # Python backend — anomaly detection, WebUI, Bridge RPC
+│   ├── main.py           # Python backend — anomaly detection, WebUI, Bridge RPC, MQTT
+│   └── db.py             # SQLite cache — anomalies, environment, metadata
 └── assets/
     ├── index.html        # Dashboard — QSense Factory v2 design system
     ├── style.css         # QSense design tokens (Coral/Amber/Slate/Sage pipeline colours)
