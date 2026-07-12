@@ -568,6 +568,22 @@ body {
   border-bottom: none;
 }
 
+.anomaly-list-item--critical {
+  border-left: 3px solid var(--coral);
+  padding-left: 10px;
+  margin-left: -13px;
+}
+
+.anomaly-list-item--critical .anomaly-score {
+  color: var(--coral);
+  font-weight: 700;
+}
+
+.anomaly-list-item--critical .anomaly-text {
+  color: var(--coral);
+  font-weight: 700;
+}
+
 .anomaly-score {
   font-family: 'Clash Display', sans-serif;
   font-weight: 500;

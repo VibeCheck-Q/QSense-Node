@@ -396,10 +396,8 @@ function renderAnomalies() {
         return; // Skip empty anomaly objects
       }
 
-      const listItem = document.createElement('li');
-      listItem.className = 'anomaly-list-item';
-
       const score = parsedAnomaly.score.toFixed(1);
+      const isCritical = parsedAnomaly.score >= 5;
       const date = new Date(parsedAnomaly.timestamp);
 
       const timeString = date.toLocaleTimeString('it-IT', {
@@ -413,9 +411,12 @@ function renderAnomalies() {
         year: 'numeric',
       });
 
+      const listItem = document.createElement('li');
+      listItem.className = `anomaly-list-item${isCritical ? ' anomaly-list-item--critical' : ''}`;
+
       listItem.innerHTML = `
         <span class="anomaly-score">${score}</span>
-        <span class="anomaly-text">Anomaly</span>
+        <span class="anomaly-text">${isCritical ? '🔴 CRITICAL' : 'Anomaly'}</span>
         <span class="anomaly-time">${timeString} - ${dateString}</span>
       `;
 
