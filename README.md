@@ -1,5 +1,7 @@
 # QSense Node — Machine Monitor
 
+![Hardare Connection](./assets/docs_assets/node-flow.jpeg)
+
 > Part of **QSense Factory** · Snapdragon Multiverse Hackathon  
 > Stage: **Detect** — the first node in the `Detect → Alert → Diagnose → Resolve` closed loop.
 
