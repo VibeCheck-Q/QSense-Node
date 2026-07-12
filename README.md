@@ -226,7 +226,22 @@ The app ID is `user:qsense-machine-monitoring`.
    - Use the numeric input for scores above the slider range (>20).
 
 6. **Trigger a test anomaly**  
-   Shake the sensor by hand. The **Machine Status** panel will switch to ⚠️ ANOMALY DETECTED and log it in **Recent Anomalies** with a score and timestamp. If the score exceeds **5.0** (Critical), the status switches to 🔴 CRITICAL and the buzzer fires a 3-second alarm tone.
+   Shake the sensor by hand. The **Machine Status** panel will switch to ⚠️ ANOMALY DETECTED and log it in **Recent Anomalies** with a score and timestamp. If the score exceeds **5.0** (Critical):
+   - Status locks to 🔴 **CRITICAL — Machine stopped. Awaiting resolve.**
+   - Buzzer fires a 3-second alarm tone
+   - LED matrix starts blinking
+   - Machine output (pins D9/D10) is cut
+
+7. **Resolve a critical alert**  
+   Once the repair is done, publish the resolve command from any MQTT client on the network:
+   ```bash
+   mosquitto_pub -h "test.mosquitto.org" -t "qsense/machine/ack" \
+     -m '{"alertId": "M-01", "resolved": 1}'
+   ```
+   This will:
+   - Return the dashboard to 🟢 **NOMINAL — All systems operating normally**
+   - Turn off the LED matrix
+   - Restart the machine (pins D9/D10)
 
 ---
 
@@ -238,7 +253,8 @@ Runs two independent timed loops:
 
 - **62.5 Hz** — reads X/Y/Z from the LSM6DSOX IMU → `Bridge.notify("record_sensor_movement")`
 - **1 Hz** — reads temperature + humidity from the HS300x → `Bridge.notify("record_sensor_samples")`
-- Registers `triggerAlertBuzzer()` as a Bridge-callable so Python can fire the buzzer remotely
+- Registers `triggerAlertBuzzer()`, `startAlertAnimation()`, and `stopAlertAnimation()` as Bridge-callables so Python can control buzzer, LED matrix, and machine output remotely
+- Machine output (D9/D10) defaults to **ON** at boot; cut immediately on critical anomaly, restored on resolve
 
 ```cpp
 // Accelerometer — 62.5 Hz
@@ -281,17 +297,15 @@ def record_sensor_samples(celsius, humidity):
 
 **Anomaly path** — on every detected anomaly:
 1. Pushes the event to the dashboard (score + timestamp)
-2. Publishes a structured MQTT alert
-3. If score ≥ 5.0 (Critical) → calls `Bridge.call("trigger_alert_buzzer")` to fire the 3-second alarm
+2. Publishes a structured MQTT alert to `qsense/machine/monitoring`
+3. If score ≥ 5.0 (Critical):
+   - Publishes `{"alertId": "M-01", "resolved": 0}` to `qsense/machine/ack`
+   - Calls `Bridge.call("start_alert_animation")` → LED matrix blinks, machine stops
+   - Calls `Bridge.call("trigger_alert_buzzer")` → 3-second alarm tone
 
-```python
-def on_detected_anomaly(anomaly_score, classification):
-    timestamp = datetime.now().isoformat()
-    ui.send_message('anomaly_detected', json.dumps({"score": anomaly_score, "timestamp": timestamp}))
-    publish_mqtt_alert(anomaly_score, timestamp)
-    if anomaly_score >= CRITICAL_SCORE_THRESHOLD:   # 5.0
-        Bridge.call("trigger_alert_buzzer")
-```
+**Resolve path** — when `{"alertId": "M-01", "resolved": 1}` arrives on `qsense/machine/ack`:
+1. Sends `machine_resolved` WebUI event → dashboard returns to 🟢 NOMINAL
+2. Calls `Bridge.call("stop_alert_animation")` → LED off, machine restarts
 
 **Threshold control** — slider changes arrive as WebUI messages and apply immediately without restart:
 
@@ -308,7 +322,7 @@ Built with the **QSense Factory design system (v2 — light/minimal)**:
 |---|---|
 | **Stats bar** | Machine ID · Placement · Run-time · Last Anomaly · Live Date & Time |
 | **Machine Faults** | Full-width live X/Y/Z waveform (HTML5 Canvas, 200 pts rolling) |
-| **Machine Status** | Industrial badge — 🟢 NOMINAL / ⚠️ ANOMALY / 🔴 CRITICAL |
+| **Machine Status** | Industrial badge — 🟢 NOMINAL / ⚠️ ANOMALY / 🔴 CRITICAL (locked until resolved=1) |
 | **Anomaly Threshold** | Pill slider (0–20+) with live numeric input and reset |
 | **Recent Anomalies** | Last 5 events — score, label, timestamp (scrollable) |
 | **Temperature** | Live big-number display + Chart.js sparkline |
